@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="id" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PuTTYgen</title>
+  <link rel="stylesheet" href="vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="titlebar-drag"></div>
+
+  <main class="app">
+    <!-- Header -->
+    <header class="d-flex align-items-center gap-3 mb-3">
+      <div class="app-logo"><i data-lucide="key-round"></i></div>
+      <div class="flex-grow-1">
+        <h1 class="h5 mb-0 fw-semibold">PuTTYgen</h1>
+        <div class="small text-body-secondary">Generator &amp; konverter kunci SSH</div>
+      </div>
+      <span class="badge rounded-pill text-bg-light border" id="versionBadge">puttygen …</span>
+    </header>
+
+    <div class="alert alert-danger d-none" id="missingAlert">
+      <div class="d-flex gap-2">
+        <i data-lucide="triangle-alert"></i>
+        <div><strong>puttygen tidak ditemukan.</strong> Install dulu lewat Terminal:
+          <code class="d-block mt-1">brew install putty</code></div>
+      </div>
+    </div>
+
+    <!-- Kunci -->
+    <section class="card shadow-sm mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i data-lucide="file-key" class="icon-sm"></i>
+        <span class="fw-semibold">Kunci</span>
+        <div class="ms-auto d-flex gap-1" id="keyBadges"></div>
+      </div>
+      <div class="card-body">
+        <div id="keyEmpty" class="empty-state text-center py-4">
+          <div class="empty-icon mb-2"><i data-lucide="key-round"></i></div>
+          <div class="fw-medium">Belum ada kunci</div>
+          <div class="small text-body-secondary">Buat pasangan kunci baru, muat private key yang sudah ada,
+            atau seret file kunci ke jendela ini.</div>
+        </div>
+
+        <div id="keyPanel" class="d-none">
+          <div class="d-flex align-items-end mb-1">
+            <label for="pubkey" class="form-label small fw-medium mb-0" id="pubLabel">
+              Public key untuk ditempel ke file authorized_keys OpenSSH:</label>
+            <button class="btn btn-sm btn-outline-secondary ms-auto" id="copyPub" title="Salin public key">
+              <i data-lucide="copy" class="icon-sm"></i> Salin</button>
+          </div>
+          <textarea id="pubkey" class="form-control font-monospace small mb-3" rows="4" readonly spellcheck="false"></textarea>
+
+          <div class="row g-2 align-items-center mb-2">
+            <label class="col-sm-3 col-form-label col-form-label-sm" for="fingerprint">Fingerprint kunci</label>
+            <div class="col-sm-9">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i data-lucide="fingerprint" class="icon-sm"></i></span>
+                <input id="fingerprint" class="form-control font-monospace" readonly>
+                <select id="fpType" class="form-select flex-grow-0 w-auto" title="Jenis fingerprint">
+                  <option value="sha256">SHA256</option>
+                  <option value="md5">MD5</option>
+                  <option value="sha256-cert">SHA256 + sertifikat</option>
+                  <option value="md5-cert">MD5 + sertifikat</option>
+                </select>
+                <button class="btn btn-outline-secondary" id="copyFp" title="Salin fingerprint"><i data-lucide="copy" class="icon-sm"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-2 align-items-center mb-2">
+            <label class="col-sm-3 col-form-label col-form-label-sm" for="comment">Komentar kunci</label>
+            <div class="col-sm-9">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i data-lucide="message-square" class="icon-sm"></i></span>
+                <input id="comment" class="form-control" spellcheck="false" autocomplete="off">
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-2 align-items-center mb-2">
+            <label class="col-sm-3 col-form-label col-form-label-sm" for="pass1">Passphrase kunci</label>
+            <div class="col-sm-9">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i data-lucide="lock" class="icon-sm"></i></span>
+                <input id="pass1" type="password" class="form-control" autocomplete="new-password">
+                <button class="btn btn-outline-secondary toggle-pass" data-target="pass1" data-target2="pass2" title="Tampilkan/sembunyikan"><i data-lucide="eye" class="icon-sm"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-2 align-items-center">
+            <label class="col-sm-3 col-form-label col-form-label-sm" for="pass2">Konfirmasi passphrase</label>
+            <div class="col-sm-9">
+              <div class="input-group input-group-sm has-validation">
+                <span class="input-group-text"><i data-lucide="lock-keyhole" class="icon-sm"></i></span>
+                <input id="pass2" type="password" class="form-control" autocomplete="new-password">
+                <div class="invalid-feedback">Kedua passphrase tidak sama.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="row g-3">
+      <!-- Aksi -->
+      <div class="col-md-6">
+        <section class="card shadow-sm h-100">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i data-lucide="zap" class="icon-sm"></i><span class="fw-semibold">Aksi</span>
+          </div>
+          <div class="list-group list-group-flush">
+            <div class="list-group-item action-row">
+              <div class="action-icon bg-primary-subtle text-primary-emphasis"><i data-lucide="sparkles"></i></div>
+              <div class="flex-grow-1 small">Buat pasangan public/private key</div>
+              <button class="btn btn-primary btn-sm" id="btnGenerate"><i data-lucide="key-round" class="icon-sm"></i> Generate</button>
+            </div>
+            <div class="list-group-item action-row">
+              <div class="action-icon bg-info-subtle text-info-emphasis"><i data-lucide="folder-open"></i></div>
+              <div class="flex-grow-1 small">Muat file private key yang sudah ada</div>
+              <button class="btn btn-outline-primary btn-sm" id="btnLoad"><i data-lucide="upload" class="icon-sm"></i> Load</button>
+            </div>
+            <div class="list-group-item action-row">
+              <div class="action-icon bg-success-subtle text-success-emphasis"><i data-lucide="save"></i></div>
+              <div class="flex-grow-1 small">Simpan kunci yang dibuat</div>
+              <div class="d-flex gap-1 flex-wrap justify-content-end">
+                <button class="btn btn-outline-success btn-sm needs-key" id="btnSavePub"><i data-lucide="file-output" class="icon-sm"></i> Public key</button>
+                <button class="btn btn-success btn-sm needs-key" id="btnSavePriv"><i data-lucide="file-lock-2" class="icon-sm"></i> Private key</button>
+              </div>
+            </div>
+            <div class="list-group-item action-row">
+              <div class="action-icon bg-warning-subtle text-warning-emphasis"><i data-lucide="arrow-right-left"></i></div>
+              <div class="flex-grow-1 small">Konversi &amp; sertifikat</div>
+              <div class="d-flex gap-1">
+                <div class="dropdown">
+                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" id="btnConv">
+                    <i data-lucide="repeat-2" class="icon-sm"></i> Konversi</button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow">
+                    <li><a class="dropdown-item" href="#" data-action="import"><i data-lucide="download" class="icon-sm"></i> Import key…</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" data-action="exportOpenSSH"><i data-lucide="file-code-2" class="icon-sm"></i> Export OpenSSH key…</a></li>
+                    <li><a class="dropdown-item" href="#" data-action="exportOpenSSHNew"><i data-lucide="file-code-2" class="icon-sm"></i> Export OpenSSH key (paksa format baru)…</a></li>
+                    <li><a class="dropdown-item" href="#" data-action="exportSshcom"><i data-lucide="file-code-2" class="icon-sm"></i> Export ssh.com key…</a></li>
+                  </ul>
+                </div>
+                <div class="dropdown">
+                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" id="btnCert">
+                    <i data-lucide="award" class="icon-sm"></i></button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow">
+                    <li><a class="dropdown-item" href="#" data-action="addCert"><i data-lucide="badge-plus" class="icon-sm"></i> Tambahkan sertifikat…</a></li>
+                    <li><a class="dropdown-item" href="#" data-action="removeCert"><i data-lucide="badge-minus" class="icon-sm"></i> Hapus sertifikat</a></li>
+                    <li><a class="dropdown-item" href="#" data-action="certInfo"><i data-lucide="badge-info" class="icon-sm"></i> Info sertifikat…</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Parameter -->
+      <div class="col-md-6">
+        <section class="card shadow-sm h-100">
+          <div class="card-header d-flex align-items-center gap-2">
+            <i data-lucide="sliders-horizontal" class="icon-sm"></i><span class="fw-semibold">Parameter</span>
+            <button class="btn btn-sm btn-link ms-auto p-0 text-decoration-none" data-action="params">
+              <i data-lucide="settings-2" class="icon-sm"></i> Parameter file .ppk</button>
+          </div>
+          <div class="card-body">
+            <div class="small fw-medium mb-2">Jenis kunci yang dibuat</div>
+            <div class="type-grid mb-3" id="typeGrid">
+              <input type="radio" class="btn-check" name="ktype" id="t-rsa" value="rsa">
+              <label class="type-tile" for="t-rsa"><span class="fw-semibold">RSA</span><small>Paling kompatibel</small></label>
+              <input type="radio" class="btn-check" name="ktype" id="t-dsa" value="dsa">
+              <label class="type-tile" for="t-dsa"><span class="fw-semibold">DSA</span><small>Lama</small></label>
+              <input type="radio" class="btn-check" name="ktype" id="t-ecdsa" value="ecdsa">
+              <label class="type-tile" for="t-ecdsa"><span class="fw-semibold">ECDSA</span><small>Kurva NIST</small></label>
+              <input type="radio" class="btn-check" name="ktype" id="t-eddsa" value="eddsa">
+              <label class="type-tile" for="t-eddsa"><span class="fw-semibold">EdDSA</span><small>Disarankan</small></label>
+              <input type="radio" class="btn-check" name="ktype" id="t-rsa1" value="rsa1">
+              <label class="type-tile" for="t-rsa1"><span class="fw-semibold">SSH-1 (RSA)</span><small>Warisan</small></label>
+            </div>
+
+            <div id="bitsRow" class="mb-3">
+              <label class="form-label small fw-medium" for="bits">Jumlah bit kunci</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i data-lucide="hash" class="icon-sm"></i></span>
+                <input id="bits" type="number" min="256" step="1" class="form-control">
+                <button class="btn btn-outline-secondary bits-preset" data-bits="2048">2048</button>
+                <button class="btn btn-outline-secondary bits-preset" data-bits="3072">3072</button>
+                <button class="btn btn-outline-secondary bits-preset" data-bits="4096">4096</button>
+              </div>
+            </div>
+
+            <div id="curveRow" class="mb-3 d-none">
+              <label class="form-label small fw-medium" for="curve">Kurva</label>
+              <select id="curve" class="form-select form-select-sm">
+                <option value="nistp256">nistp256 (256 bit)</option>
+                <option value="nistp384">nistp384 (384 bit)</option>
+                <option value="nistp521">nistp521 (521 bit)</option>
+              </select>
+            </div>
+
+            <div id="edRow" class="mb-3 d-none">
+              <label class="form-label small fw-medium" for="edcurve">Kurva</label>
+              <select id="edcurve" class="form-select form-select-sm">
+                <option value="ed25519">Ed25519 (255 bit)</option>
+                <option value="ed448">Ed448 (448 bit)</option>
+              </select>
+            </div>
+
+            <div id="primeRow">
+              <label class="form-label small fw-medium" for="primes">Metode bilangan prima</label>
+              <select id="primes" class="form-select form-select-sm mb-2">
+                <option value="probable">Probable primes (cepat)</option>
+                <option value="proven">Proven primes (lebih lambat)</option>
+                <option value="proven-even">Proven primes, distribusi merata (paling lambat)</option>
+              </select>
+              <div class="form-check form-switch small" id="strongRow">
+                <input class="form-check-input" type="checkbox" role="switch" id="strong">
+                <label class="form-check-label" for="strong">Pakai "strong" primes sebagai faktor kunci RSA</label>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Overlay proses -->
+  <div id="busy" class="busy d-none">
+    <div class="busy-card shadow">
+      <div class="spinner-border text-primary mb-3" role="status"></div>
+      <div class="fw-medium" id="busyText">Membuat kunci…</div>
+      <div class="small text-body-secondary" id="busySub"></div>
+    </div>
+  </div>
+
+  <!-- Modal: passphrase saat memuat kunci -->
+  <div class="modal fade" id="passModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <form class="modal-content" id="passForm">
+        <div class="modal-header">
+          <h2 class="modal-title fs-6 d-flex align-items-center gap-2"><i data-lucide="lock" class="icon-sm"></i> Kunci dilindungi passphrase</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small mb-2">Masukkan passphrase untuk <strong id="passKeyName"></strong>:</p>
+          <div class="input-group has-validation">
+            <input id="loadPass" type="password" class="form-control" autocomplete="off">
+            <button type="button" class="btn btn-outline-secondary toggle-pass" data-target="loadPass" title="Tampilkan/sembunyikan"><i data-lucide="eye" class="icon-sm"></i></button>
+            <div class="invalid-feedback">Passphrase salah, coba lagi.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary"><i data-lucide="lock-open" class="icon-sm"></i> Buka</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: parameter file kunci -->
+  <div class="modal fade" id="paramsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <form class="modal-content" id="paramsForm">
+        <div class="modal-header">
+          <h2 class="modal-title fs-6 d-flex align-items-center gap-2"><i data-lucide="settings-2" class="icon-sm"></i> Parameter penyimpanan file kunci PPK</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body small">
+          <div class="mb-3">
+            <div class="fw-medium mb-1">Versi format file PPK</div>
+            <div class="btn-group btn-group-sm" role="group">
+              <input type="radio" class="btn-check" name="ppkver" id="ppk2" value="2"><label class="btn btn-outline-primary" for="ppk2">Versi 2</label>
+              <input type="radio" class="btn-check" name="ppkver" id="ppk3" value="3"><label class="btn btn-outline-primary" for="ppk3">Versi 3</label>
+            </div>
+            <div class="form-text">Versi 2 untuk aplikasi lama (PuTTY &lt; 0.75, WinSCP/FileZilla versi lama).</div>
+          </div>
+          <fieldset id="kdfFields">
+            <div class="mb-3">
+              <div class="fw-medium mb-1">Fungsi derivasi kunci (KDF)</div>
+              <div class="btn-group btn-group-sm" role="group">
+                <input type="radio" class="btn-check" name="kdf" id="kdf-id" value="argon2id"><label class="btn btn-outline-primary" for="kdf-id">Argon2id</label>
+                <input type="radio" class="btn-check" name="kdf" id="kdf-i" value="argon2i"><label class="btn btn-outline-primary" for="kdf-i">Argon2i</label>
+                <input type="radio" class="btn-check" name="kdf" id="kdf-d" value="argon2d"><label class="btn btn-outline-primary" for="kdf-d">Argon2d</label>
+              </div>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label fw-medium" for="kdfMemory">Memori untuk hash passphrase (KB)</label>
+                <input id="kdfMemory" type="number" min="1" class="form-control form-control-sm">
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-medium" for="kdfPar">Paralelisme hash passphrase</label>
+                <input id="kdfPar" type="number" min="1" class="form-control form-control-sm">
+              </div>
+            </div>
+            <div class="fw-medium mb-1">Waktu untuk hash passphrase</div>
+            <div class="input-group input-group-sm">
+              <input id="kdfTimeVal" type="number" min="1" class="form-control">
+              <input type="radio" class="btn-check" name="kdfmode" id="mode-time" value="time"><label class="btn btn-outline-secondary" for="mode-time">milidetik</label>
+              <input type="radio" class="btn-check" name="kdfmode" id="mode-passes" value="passes"><label class="btn btn-outline-secondary" for="mode-passes">putaran (passes)</label>
+            </div>
+          </fieldset>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link me-auto" id="paramsReset">Kembalikan default</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="submit" class="btn btn-primary">OK</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: konfirmasi / informasi -->
+  <div class="modal fade" id="msgModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-body d-flex gap-3 pt-4">
+          <div class="msg-icon" id="msgIcon"></div>
+          <div class="flex-grow-1 min-w-0">
+            <h2 class="fs-6 fw-semibold mb-1" id="msgTitle"></h2>
+            <div class="small msg-text" id="msgText"></div>
+            <pre class="small bg-body-tertiary border rounded p-2 mt-2 mb-0 d-none" id="msgPre"></pre>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-secondary" id="msgCancel">Batal</button>
+          <button type="button" class="btn btn-primary" id="msgOk">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: tentang -->
+  <div class="modal fade" id="aboutModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content text-center">
+        <div class="modal-body pt-4">
+          <div class="app-logo app-logo-lg mx-auto mb-3"><i data-lucide="key-round"></i></div>
+          <h2 class="h6 fw-semibold mb-1">PuTTYgen untuk Mac</h2>
+          <div class="small text-body-secondary mb-3" id="aboutVersion"></div>
+          <p class="small mb-1">Tampilan grafis untuk <code>puttygen</code> resmi dari PuTTY.
+            Semua proses kunci dikerjakan oleh puttygen itu sendiri.</p>
+          <p class="small text-body-secondary mb-0">UI: Bootstrap 5 · Ikon: Lucide</p>
+        </div>
+        <div class="modal-footer justify-content-center border-0 pt-0">
+          <button type="button" class="btn btn-primary btn-sm px-4" data-bs-dismiss="modal">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toasts"></div>
+
+  <script src="vendor/bootstrap.bundle.min.js"></script>
+  <script src="vendor/lucide.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
